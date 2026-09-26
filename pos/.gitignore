@@ -1,0 +1,35 @@
+# pos/ — see the repository root .gitignore for the full rule set.
+
+node_modules
+dist
+dist-ssr
+*.local
+public/version.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime uploads
+uploads/
+
+# Environment files — never commit credentials
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

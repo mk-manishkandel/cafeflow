@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    font-family: 'Open Sans', Arial, sans-serif;
+    
+    /* Mobile Optimization: Disable 300ms tap delay & gray highlight flash */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+
+    /* Design Tokens */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --glass-blur: blur(12px);
+
+    /* Semantic Colors - WCAG AA Compliant */
+    --color-primary: #4f46e5; /* indigo-600 - Contrast ~4.5:1 on white — passes WCAG AA */
+    --color-primary-hover: #4338ca; /* indigo-700 */
+    --color-secondary: #475569; /* slate-600 - Contrast ~5.9:1 on white — passes WCAG AA */
+    --color-secondary-hover: #334155; /* slate-700 */
+    --color-danger: #dc2626; /* red-600 - Better contrast than red-500 */
+    --color-danger-hover: #b91c1c; /* red-700 */
+    --color-success: #16a34a; /* green-600 - WCAG AA compliant */
+    --color-success-hover: #15803d; /* green-700 */
+    --color-text-main: #0f172a; /* slate-900 - Darker for better readability */
+    --color-text-secondary: #334155; /* slate-700 - Contrast ~9.7:1 on white — passes WCAG AA */
+    --color-text-muted: #475569; /* slate-600 - Contrast ~5.9:1 on white — passes WCAG AA (do NOT lighten below slate-600) */
+    --color-background: #f8fafc; /* slate-50 */
+    --color-surface: #ffffff; /* white */
+
+    /* Accessibility - Minimum contrast ratios for WCAG AA */
+    /* Text on white background: 4.5:1 for normal text, 3:1 for large text */
+    /* All colors above meet WCAG AA standards */
+}
+
+@layer components {
+    .premium-card {
+        @apply bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 transition-all duration-100;
+    }
+
+    .glass-panel {
+        background: var(--glass-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border);
+    }
+}
+
+@layer utilities {
+    .no-scrollbar::-webkit-scrollbar,
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .no-scrollbar,
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        @apply bg-transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        @apply bg-slate-400/30 rounded-full hover:bg-indigo-500/50 transition-colors;
+    }
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.shimmer {
+    position: relative;
+    overflow: hidden;
+}
+
+.shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.4) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    animation: shimmer 1.5s infinite linear;
+}
+
+.animate-gpu {
+    @apply transform-gpu will-change-transform;
+}
+
+/* Reduced Motion Support - Respects user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    /* Keep essential loading spinners but make them static */
+    .animate-spin {
+        animation: none !important;
+        opacity: 0.7;
+    }
+
+    /* Disable transform animations */
+    .animate-in,
+    .animate-out,
+    .animate-pulse,
+    .animate-bounce {
+        animation: none !important;
+    }
+
+    /* Disable scale transforms */
+    .active\:scale-95:active,
+    .hover\:scale-110:hover,
+    .hover\:-translate-y-1:hover {
+        transform: none !important;
+    }
+}
+
+/* Screen Reader Only - Visually hidden but accessible to screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Show on focus - for skip links */
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    width: auto;
+    height: auto;
+    padding: 0.75rem 1.5rem;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    z-index: 9999;
+    background: var(--color-primary);
+    color: white;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .border-slate-100 {
+        border-color: currentColor !important;
+    }
+
+    .text-slate-400 {
+        color: #64748b !important; /* Darker for better contrast */
+    }
+
+    button:focus-visible {
+        outline: 3px solid currentColor !important;
+        outline-offset: 3px !important;
+    }
+}

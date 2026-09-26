@@ -1,0 +1,57 @@
+{
+  "name": "cafeflow-pos",
+  "private": true,
+  "version": "6.3.175",
+  "type": "module",
+  "workspaces": [
+    "server"
+  ],
+  "overrides": {
+    "serialize-javascript": "^7.0.2"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "node generate-version.js && vite build && (chown -R www-data:www-data dist || echo 'Skipping chown')",
+    "preview": "vite preview",
+    "start": "NODE_ENV=production node server/index.cjs",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:ci": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings=0",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\""
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "dompurify": "^3.4.7",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.12.0",
+    "react-window": "^1.8.10",
+    "recharts": "^3.6.0",
+    "socket.io-client": "^4.8.3",
+    "ua-parser-js": "^2.0.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-window": "^1.8.8",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.23",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "postcss": "^8.5.6",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

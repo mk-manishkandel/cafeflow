@@ -1,0 +1,41 @@
+{
+  "_comment": "Server workspace manifest. Installed via npm workspaces from the pos/ root (single root package-lock.json). Contains every package required by server/*.cjs code so the server can also be deployed standalone (npm install --workspace server or npm install inside server/). Version conflicts with the historical root manifest were reconciled to the higher semver range (@google/genai ^1.38.0, pg ^8.17.1). Frontend/shared dependencies live in the root package.json.",
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.cjs",
+  "scripts": {
+    "start": "node index.cjs",
+    "dev": "nodemon index.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^1.38.0",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "node-thermal-printer": "^4.6.0",
+    "nodemailer": "^7.0.12",
+    "pg": "^8.17.1",
+    "rate-limit-redis": "^4.3.1",
+    "redis": "^5.10.0",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "zod": "^4.3.6"
+  }
+}
