@@ -1,6 +1,7 @@
 {
   "name": "cafeflow-pos",
   "private": true,
+  "license": "MIT",
   "version": "6.3.175",
   "type": "module",
   "workspaces": [

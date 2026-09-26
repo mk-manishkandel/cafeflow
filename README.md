@@ -1,5 +1,7 @@
 # CafeFlow POS
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 CafeFlow is a cafeteria point-of-sale and account management system for institutions
 that run staff and student canteens across one or more branches. It has two apps:
 
@@ -25,7 +27,7 @@ that run staff and student canteens across one or more branches. It has two apps
 - **Printing.** Direct TCP/IP (ESC/POS, port 9100) network printers per branch, or
   browser printing, with editable document templates (KOT, bill, receipt and others).
 - **Email** through SMTP settings configured in the app, plus editable email templates.
-- **Integration API** authenticated by API key for external systems (see [docs/API.md](docs/API.md)).
+- **Integration API** authenticated by API key for external systems (see [student-order/docs/API.md](student-order/docs/API.md)).
 
 ## Tech stack
 
@@ -48,10 +50,11 @@ git clone https://github.com/mk-manishkandel/cafeflow.git /opt/cafeflow
 sudo bash /opt/cafeflow/deploy.sh
 ```
 
-Then open the POS URL and create the first admin account in the setup wizard.
-`deploy.sh` serves plain HTTP only, and production auth cookies need HTTPS, so add TLS
-before going live. See [DEPLOYMENT.md](DEPLOYMENT.md) for TLS, manual installation,
-updates and troubleshooting.
+The installer asks for your domain and how HTTPS is provided: behind a proxy such as
+Cloudflare, or a free Let's Encrypt certificate on the server. HTTPS is required,
+because production login cookies are Secure. Then open the POS URL and create the
+first admin account in the setup wizard. See [DEPLOYMENT.md](DEPLOYMENT.md) for manual
+installation, updates, backups and troubleshooting.
 
 ### Local development
 
@@ -97,8 +100,8 @@ Useful scripts in `pos/`: `npm run build`, `npm run lint`, `npm run lint:fix`, `
 │       ├── schema.sql      # Complete database schema
 │       ├── routes/ controllers/ middleware/ jobs/ workers/ utils/
 │       └── templates/      # Excel export templates, email templates
-├── student-order/          # Student pre-ordering app (React/Vite)
-└── docs/API.md             # Integration API and student ordering API
+└── student-order/          # Student pre-ordering app (React/Vite)
+    └── docs/API.md         # Integration API and student ordering API
 ```
 
 ## Documentation
@@ -106,8 +109,15 @@ Useful scripts in `pos/`: `npm run build`, `npm run lint`, `npm run lint:fix`, `
 | Document | Contents |
 |----------|----------|
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Installation, configuration, TLS, updates, backups, production checklist, troubleshooting |
-| [docs/API.md](docs/API.md) | Integration API (API key) and student ordering API |
+| [student-order/docs/API.md](student-order/docs/API.md) | Integration API (API key) and student ordering API |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup and how to submit changes |
+| [SECURITY.md](SECURITY.md) | How to report a vulnerability |
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). To report
+a security problem, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## License
 
-Proprietary. See [LICENSE](LICENSE). © 2026 Manish Kandel.
+[MIT](LICENSE) © 2026 Manish Kandel

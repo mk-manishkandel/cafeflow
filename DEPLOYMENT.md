@@ -126,8 +126,7 @@ In production (`NODE_ENV=production`) the server sets its auth and CSRF cookies 
 asks how HTTPS is provided (`TLS_MODE`):
 
 - **`proxy`** (default): HTTPS is terminated in front of this server, for example by
-  Cloudflare or a tunnel. Point it at nginx on port 80. This is how the main
-  `pos.bic.edu.np` server runs.
+  Cloudflare or a tunnel. Point it at nginx on port 80.
 - **`certbot`**: `deploy.sh` gets a Let's Encrypt certificate on this server. The
   domain must already point here and port 80 must be reachable from the internet.
   Renewal is automatic (certbot's systemd timer).
@@ -281,7 +280,7 @@ cd student-order && npm install && npm run build   # output: student-order/dist
 3. Turn on self-service in the branch's settings, and mark menu items as today's menu
    in the menu editor.
 
-The API contract is documented in [docs/API.md](docs/API.md#part-2-student-ordering-api).
+The API contract is documented in [student-order/docs/API.md](student-order/docs/API.md#part-2-student-ordering-api).
 
 ---
 
