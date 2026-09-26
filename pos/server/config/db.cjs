@@ -21,7 +21,9 @@ if (!process.env.DB_PASSWORD) {
 
 // Calculate optimal pool size based on cluster instances
 // For PM2 cluster mode: divide total connections across instances
-const totalConnections = parseInt(process.env.DB_POOL_MAX) || 100;
+// Default stays below PostgreSQL's default max_connections (100) to leave room for
+// backups and admin sessions.
+const totalConnections = parseInt(process.env.DB_POOL_MAX) || 80;
 const instanceCount = parseInt(process.env.NODE_APP_INSTANCE_COUNT) ||
                      require('os').cpus().length;
 const poolSize = Math.max(5, Math.floor(totalConnections / instanceCount));
@@ -33,8 +35,8 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
     port: parseInt(process.env.DB_PORT),
     // Dynamic Connection Pool for Clustering
-    // In cluster mode: 100 total connections / 8 instances = ~12 per instance
-    // In single mode: 100 / 1 = 100 connections
+    // In cluster mode: 80 total connections / 3 instances = ~26 per instance
+    // In single mode: 80 / 1 = 80 connections
     max: poolSize,
     min: 2, // Keep 2 warm connections per instance to avoid cold-start latency after idle
     idleTimeoutMillis: 30000, // Close idle clients after 30s
