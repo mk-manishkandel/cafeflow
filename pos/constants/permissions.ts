@@ -87,8 +87,7 @@ export const PERMISSION_GROUPS = [
         permissions: [
             { id: 'SELF_SERVICE_VIEW', label: 'View Self-Service Status' },
             { id: 'SELF_SERVICE_MANAGE', label: 'Manage Menu Availability' },
-            { id: 'SELF_SERVICE_VIEW_TRANSACTIONS', label: 'View Order History' },
-            { id: 'SELF_SERVICE_VIEW_LOGS', label: 'View Activity Logs' }
+            { id: 'SELF_SERVICE_VIEW_TRANSACTIONS', label: 'View Student Orders' }
         ]
     }
 ];

@@ -4,6 +4,7 @@ const { getSafeTimezone } = require('../utils/timezone.cjs');
 const { sendEmail } = require('../email.cjs');
 const { studentOrderConfirmationTemplate } = require('../templates/studentOrderConfirmation.cjs');
 const { ROLES } = require('../utils/roleHierarchy.cjs');
+const { emitEvent } = require('../socket.cjs');
 
 const ORDER_ID_RE = /^\d{4}-\d{2}-\d{2}-\d{4}$/;
 
@@ -200,6 +201,7 @@ const createStudentOrder = async (req, res) => {
         });
 
         logger.info(`[StudentOrder] Created order ${orderId} for ${studentEmail}, branch: ${branchName}, total: ${computedTotal.toFixed(2)}`);
+        emitEvent('student-order:updated', { orderId, status: 'PENDING' }, branchId);
 
         return res.status(201).json({ orderId });
 
@@ -291,6 +293,7 @@ const markStudentOrderLoaded = async (req, res) => {
         }
 
         logger.info(`[StudentOrder] Order ${orderId} marked as LOADED_TO_POS by user ${req.user?.id}`);
+        emitEvent('student-order:updated', { orderId, status: 'LOADED_TO_POS' }, order.branch_id);
         return res.json({ success: true });
 
     } catch (err) {
@@ -336,6 +339,7 @@ const markStudentOrderCompleted = async (req, res) => {
         }
 
         logger.info(`[StudentOrder] Order ${orderId} marked as COMPLETED by user ${req.user?.id}`);
+        emitEvent('student-order:updated', { orderId, status: 'COMPLETED' }, order.branch_id);
         return res.json({ success: true });
 
     } catch (err) {

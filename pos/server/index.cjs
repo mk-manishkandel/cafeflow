@@ -183,11 +183,7 @@ const runDatabaseHousekeeping = async () => {
         // --- Log Retention Policies ---
         logger.info('Housekeeping: Running log retention policies...');
 
-        // 1. FnB Activity Logs — 90-day retention
-        const activityPrune = await pool.query(`DELETE FROM fnb_activity_logs WHERE created_at < NOW() - INTERVAL '90 days'`);
-        if (activityPrune.rowCount > 0) logger.info(`Housekeeping: Pruned ${activityPrune.rowCount} old activity logs (90d).`);
-
-        // 2. Audit Logs — F7.2: 365-day retention via partition drop + boundary
+        // 1. Audit Logs — F7.2: 365-day retention via partition drop + boundary
         // DELETE (was 35 days — too short for financial audit evidence).
         // Dropping whole monthly partitions is instant (no table scan). Only the
         // boundary month (the one containing the cutoff) is row-deleted.
@@ -198,7 +194,7 @@ const runDatabaseHousekeeping = async () => {
             logger.info(`Housekeeping: Audit log retention (${AUDIT_LOG_RETENTION_DAYS}d): dropped ${dropped_partitions} partition(s), deleted ${deleted_rows} boundary row(s).`);
         }
 
-        // 3. Print Jobs — aggressive cleanup for PRINTED, 90-day cap for others
+        // 2. Print Jobs — aggressive cleanup for PRINTED, 90-day cap for others
         const printedPrune = await pool.query("DELETE FROM print_jobs WHERE status = 'PRINTED' AND updated_at < NOW() - INTERVAL '24 hours'");
         if (printedPrune.rowCount > 0) logger.info(`Housekeeping: Pruned ${printedPrune.rowCount} PRINTED print jobs older than 24h.`);
 

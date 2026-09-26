@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutGrid, ReceiptText, RefreshCcw,
-    Power, Layers, GitBranch
+    Power, GitBranch
 } from 'lucide-react';
 import { PageHeader } from './shared/PageHeader';
 import { useBranch } from '../contexts/BranchContext';
@@ -14,10 +14,8 @@ import logger from '../utils/logger';
 // Modular Components
 import StatusTab from './self-service/StatusTab';
 import MenuTab from './self-service/MenuTab';
-import TransactionsTab from './self-service/TransactionsTab';
-import LogsTab from './self-service/LogsTab';
+import StudentOrdersTab, { StudentOrder, StudentOrderStatus } from './self-service/StudentOrdersTab';
 import TransactionDetailModal from './self-service/TransactionDetailModal';
-import LogDetailModal from './self-service/LogDetailModal';
 
 interface SelfServiceStatus {
     isSelfServiceEnabled: boolean;
@@ -39,63 +37,41 @@ interface SelfServiceStatus {
     }>;
 }
 
-interface Transaction {
-    id: string;
-    total_amount: number;
-    date: string;
-    status: string;
-    payment_method: string;
-    recipient_name: string;
-    branch_name?: string;
-    items: any[] | string;
-}
-
-interface ActivityLog {
-    id: number;
-    session_id: string;
-    action: string;
-    metadata: any;
-    created_at: string;
-    branch_id: string;
-    branch_name: string;
-    ip_address?: string;
-    user_agent?: string;
-}
-
 const SelfServiceManagement = () => {
     const { currentBranch } = useBranch();
     const { showToast } = useUI();
     const { joinBranch, lastEvent } = useSocket();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Tab persistent via URL
-    const activeTab = (searchParams.get('tab') as 'status' | 'menu' | 'transactions' | 'logs') || 'status';
+    // Tab persistent via URL. Links to the retired "transactions" tab open Student
+    // Orders; any other unknown tab (e.g. the retired "logs") falls back to status.
+    type Tab = 'status' | 'menu' | 'orders';
+    const requestedTab = searchParams.get('tab') === 'transactions' ? 'orders' : searchParams.get('tab');
+    const activeTab: Tab = requestedTab === 'menu' || requestedTab === 'orders' ? requestedTab : 'status';
     const setActiveTab = (tab: string) => {
         setSearchParams({ tab });
     };
 
     const [status, setStatus] = useState<SelfServiceStatus | null>(null);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [logs, setLogs] = useState<ActivityLog[]>([]);
-    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+    const [orders, setOrders] = useState<StudentOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
-    const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
+    const [selectedOrder, setSelectedOrder] = useState<StudentOrder | null>(null);
     const [filterBranchId, setFilterBranchId] = useState<string | null>(null);
+    const [orderStatusFilter, setOrderStatusFilter] = useState<StudentOrderStatus | null>(null);
+    const [orderSearch, setOrderSearch] = useState('');
+    const [debouncedOrderSearch, setDebouncedOrderSearch] = useState('');
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const [totalTransactions, setTotalTransactions] = useState(0);
-    const [totalLogs, setTotalLogs] = useState(0);
+    const [totalOrders, setTotalOrders] = useState(0);
     const itemsPerPage = 20;
 
     const tabs = [
         { id: 'status', label: 'Overall Status', icon: Power },
         { id: 'menu', label: 'Self-Service Menu', icon: LayoutGrid },
-        { id: 'transactions', label: 'Order History', icon: ReceiptText },
-        { id: 'logs', label: 'Activity Logs', icon: Layers }
+        { id: 'orders', label: 'Student Orders', icon: ReceiptText }
     ];
 
     const fetchStatus = async () => {
@@ -110,40 +86,22 @@ const SelfServiceManagement = () => {
         }
     };
 
-    const fetchTransactions = async (page = 1, branchFilter?: string | null) => {
+    const fetchOrders = async (page = 1) => {
         try {
-            const branch = branchFilter !== undefined ? branchFilter : filterBranchId;
-            let url = `${API_BASE}/self-service/transactions?page=${page}&limit=${itemsPerPage}`;
-            if (branch) url += `&filterBranchId=${branch}`;
-            const res = await authenticatedFetch(url);
+            const params = new URLSearchParams({ page: String(page), limit: String(itemsPerPage) });
+            if (filterBranchId) params.set('filterBranchId', filterBranchId);
+            if (orderStatusFilter) params.set('status', orderStatusFilter);
+            if (debouncedOrderSearch.trim()) params.set('search', debouncedOrderSearch.trim());
+            const res = await authenticatedFetch(`${API_BASE}/self-service/student-orders?${params}`);
             if (res.ok) {
                 const data = await res.json();
-                setTransactions(data.data);
+                setOrders(data.data);
                 setTotalPages(data.pagination.totalPages);
-                setTotalTransactions(data.pagination.total);
+                setTotalOrders(data.pagination.total);
                 setCurrentPage(data.pagination.page);
             }
         } catch (err) {
-            logger.error('Failed to fetch transactions', err);
-        }
-    };
-
-    const fetchLogs = async (page = 1, sessionId?: string, branchFilter?: string | null) => {
-        try {
-            const branch = branchFilter !== undefined ? branchFilter : filterBranchId;
-            let url = `${API_BASE}/self-service/logs?page=${page}&limit=${itemsPerPage}`;
-            if (sessionId) url += `&sessionId=${sessionId}`;
-            if (branch) url += `&filterBranchId=${branch}`;
-            const res = await authenticatedFetch(url);
-            if (res.ok) {
-                const data = await res.json();
-                setLogs(data.data);
-                setTotalPages(data.pagination.totalPages);
-                setTotalLogs(data.pagination.total);
-                setCurrentPage(data.pagination.page);
-            }
-        } catch (err) {
-            logger.error('Failed to fetch logs', err);
+            logger.error('Failed to fetch student orders', err);
         }
     };
 
@@ -221,8 +179,7 @@ const SelfServiceManagement = () => {
     const fetchData = async (showLoading = true) => {
         if (showLoading) setLoading(true);
         const fetches = [fetchStatus()];
-        if (activeTab === 'transactions') fetches.push(fetchTransactions(1, filterBranchId));
-        if (activeTab === 'logs') fetches.push(fetchLogs(1, selectedSessionId || undefined, filterBranchId));
+        if (activeTab === 'orders') fetches.push(fetchOrders(1));
         await Promise.all(fetches);
         if (showLoading) setLoading(false);
     };
@@ -232,21 +189,23 @@ const SelfServiceManagement = () => {
         if (currentBranch?.id) {
             joinBranch(currentBranch.id);
         }
-    }, [currentBranch?.id, activeTab, selectedSessionId, filterBranchId]);
+    }, [currentBranch?.id, activeTab, filterBranchId, orderStatusFilter, debouncedOrderSearch]);
+
+    // Search the orders list after the user stops typing
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedOrderSearch(orderSearch), 300);
+        return () => clearTimeout(timer);
+    }, [orderSearch]);
 
     // WebSocket Real-time updates
     useEffect(() => {
         if (!lastEvent) return;
 
-        if (lastEvent.type === 'transaction:created' || lastEvent.type === 'data:updated') {
-            if (activeTab === 'transactions') fetchTransactions(currentPage, filterBranchId);
-            if (lastEvent.type === 'data:updated') fetchStatus();
+        if (lastEvent.type === 'data:updated') fetchStatus();
+        if (lastEvent.type === 'student-order:updated' && activeTab === 'orders') {
+            fetchOrders(currentPage);
         }
-
-        if (lastEvent.type === 'fnb:activity' && activeTab === 'logs') {
-            fetchLogs(currentPage, selectedSessionId || undefined, filterBranchId);
-        }
-    }, [lastEvent, activeTab, currentPage, selectedSessionId]);
+    }, [lastEvent, activeTab, currentPage]);
 
     const filteredMenu = (Array.isArray(status?.menuItems) ? status!.menuItems : []).filter(item => {
         if (filterBranchId && item.branchId !== filterBranchId) return false;
@@ -259,7 +218,7 @@ const SelfServiceManagement = () => {
             <div className="p-4 sm:p-6 lg:p-8 space-y-6">
                 <PageHeader
                     title="FnB Self-Service"
-                    subtitle="Monitor real-time interactions and manage kiosk availability"
+                    subtitle="Manage student ordering and track pre-orders"
                     icon={LayoutGrid}
                     actions={[]}
                 />
@@ -350,30 +309,19 @@ const SelfServiceManagement = () => {
                                     />
                                 )}
 
-                                {activeTab === 'transactions' && (
-                                    <TransactionsTab
-                                        transactions={transactions}
-                                        setSelectedTx={setSelectedTx}
+                                {activeTab === 'orders' && (
+                                    <StudentOrdersTab
+                                        orders={orders}
+                                        onSelect={setSelectedOrder}
                                         isMainBranch={status?.isMainBranch || false}
+                                        statusFilter={orderStatusFilter}
+                                        onStatusFilterChange={setOrderStatusFilter}
+                                        search={orderSearch}
+                                        onSearchChange={setOrderSearch}
                                         currentPage={currentPage}
                                         totalPages={totalPages}
-                                        totalTransactions={totalTransactions}
-                                        onPageChange={fetchTransactions}
-                                        itemsPerPage={itemsPerPage}
-                                    />
-                                )}
-
-                                {activeTab === 'logs' && (
-                                    <LogsTab
-                                        logs={logs}
-                                        selectedSessionId={selectedSessionId}
-                                        setSelectedSessionId={setSelectedSessionId}
-                                        setSelectedLog={setSelectedLog}
-                                        isMainBranch={status?.isMainBranch || false}
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        totalLogs={totalLogs}
-                                        onPageChange={(p) => fetchLogs(p, selectedSessionId || undefined)}
+                                        totalOrders={totalOrders}
+                                        onPageChange={fetchOrders}
                                         itemsPerPage={itemsPerPage}
                                     />
                                 )}
@@ -383,8 +331,18 @@ const SelfServiceManagement = () => {
                 </div>
             </div>
 
-            <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
-            <LogDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+            <TransactionDetailModal
+                tx={selectedOrder && {
+                    id: selectedOrder.id,
+                    recipient_name: selectedOrder.student_email,
+                    date: selectedOrder.created_at,
+                    payment_method: 'Pay at counter',
+                    status: selectedOrder.status,
+                    items: selectedOrder.items,
+                    total_amount: Number(selectedOrder.total_amount)
+                }}
+                onClose={() => setSelectedOrder(null)}
+            />
         </div>
     );
 };

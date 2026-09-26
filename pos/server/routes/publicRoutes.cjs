@@ -57,10 +57,10 @@ router.get('/branches', publicMenuLimiter, publicMenuController.getPublicBranche
 router.get('/student-menu', studentOriginGuard, studentClientSecretGuard, publicMenuController.getStudentTodayMenu);
 router.post('/student-orders', studentOriginGuard, studentClientSecretGuard, studentOrderLimiter, validate(schemas.studentOrder), studentOrderController.createStudentOrder);
 
-// FnB Activity Logging (Public) — rate limited to prevent abuse
+// Student ordering session — the student app opens one before checkout, and
+// POST /student-orders only accepts an active session. Rate limited per IP.
 const selfServiceController = require('../controllers/selfServiceController.cjs');
 router.post('/self-service/session', selfServiceLimiter, selfServiceController.createFnBSession);
-router.post('/self-service/log', selfServiceLimiter, selfServiceController.logFnBActivity);
 
 module.exports = router;
 

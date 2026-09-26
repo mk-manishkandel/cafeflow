@@ -63,8 +63,8 @@ END $$;
 -- 2. RETIRED MODULES (existing installs only)
 -- =============================================================================
 -- Inventory, coupons, table orders, custom Excel report templates, dynamic QR /
--- storefront checkout and configurable branding have been removed from the
--- application. Drop their objects if an older database still has them.
+-- storefront checkout, configurable branding and self-service activity logs
+-- have been removed from the application. Drop their objects if an older database still has them.
 -- DESTRUCTIVE for those modules' rows (update.sh takes a pg_dump first).
 -- Historical revenue stays in `transactions` untouched.
 
@@ -85,6 +85,9 @@ DROP TABLE IF EXISTS tables;
 DROP TABLE IF EXISTS floors;
 
 DROP TABLE IF EXISTS report_templates;
+
+-- Self-service activity logging: no client ever sent events (dropping its indexes too).
+DROP TABLE IF EXISTS fnb_activity_logs;
 
 DROP INDEX IF EXISTS idx_transactions_payment_reference;
 ALTER TABLE IF EXISTS transactions    DROP COLUMN IF EXISTS payment_reference;
@@ -452,7 +455,8 @@ CREATE TABLE IF NOT EXISTS document_templates (
 );
 
 -- ---------------------------------------------------------------------------
--- Self-service (F&B kiosk) and student pre-ordering
+-- Student pre-ordering. fnb_sessions: the student app opens a session before
+-- checkout, and an order is only accepted against an active session.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS fnb_sessions (
@@ -463,14 +467,6 @@ CREATE TABLE IF NOT EXISTS fnb_sessions (
     user_agent   TEXT,
     started_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS fnb_activity_logs (
-    id         BIGSERIAL PRIMARY KEY,
-    session_id UUID REFERENCES fnb_sessions(id) ON DELETE CASCADE,
-    action     VARCHAR(100) NOT NULL,
-    metadata   JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- One row per calendar day; incremented atomically with
@@ -703,10 +699,6 @@ CREATE INDEX IF NOT EXISTS idx_document_templates_created_by  ON document_templa
 -- self-service / student orders
 CREATE INDEX IF NOT EXISTS idx_fnb_sessions_branch_id         ON fnb_sessions (branch_id);
 CREATE INDEX IF NOT EXISTS idx_fnb_sessions_status            ON fnb_sessions (status);
-CREATE INDEX IF NOT EXISTS idx_fnb_activity_logs_session_id   ON fnb_activity_logs (session_id);
-CREATE INDEX IF NOT EXISTS idx_fnb_activity_logs_action       ON fnb_activity_logs (action);
-CREATE INDEX IF NOT EXISTS idx_fnb_activity_logs_created_at   ON fnb_activity_logs (created_at);
-CREATE INDEX IF NOT EXISTS idx_fnb_activity_brin              ON fnb_activity_logs USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS idx_student_orders_status          ON student_orders (status);
 CREATE INDEX IF NOT EXISTS idx_student_orders_branch_id       ON student_orders (branch_id);
 CREATE INDEX IF NOT EXISTS idx_student_orders_created_at      ON student_orders (created_at DESC);
@@ -1079,13 +1071,15 @@ SET permissions = permissions
     - 'VIEW_INVENTORY' - 'MANAGE_INVENTORY' - 'INVENTORY_MANAGE'
     - 'RECEIVE_STOCK' - 'TRANSFER_STOCK' - 'VIEW_TRANSFERS'
     - 'ACCESS_TABLE_ORDERS' - 'MANAGE_TABLES'
+    - 'SELF_SERVICE_VIEW_LOGS'
 WHERE permissions ?| ARRAY[
     'VIEW_ANALYTICS', 'ACCESS_CUSTOMER_DISPLAY', 'MANAGE_BRANDING',
     'COUPON_VIEW', 'COUPON_GENERATE', 'COUPON_EDIT', 'COUPON_DELETE',
     'COUPON_BULK_IMPORT', 'COUPON_VERIFY', 'COUPON_PRINT',
     'VIEW_INVENTORY', 'MANAGE_INVENTORY', 'INVENTORY_MANAGE',
     'RECEIVE_STOCK', 'TRANSFER_STOCK', 'VIEW_TRANSFERS',
-    'ACCESS_TABLE_ORDERS', 'MANAGE_TABLES'];
+    'ACCESS_TABLE_ORDERS', 'MANAGE_TABLES',
+    'SELF_SERVICE_VIEW_LOGS'];
 
 -- API key scopes of retired modules. A key scoped only to retired paths is
 -- revoked (with no scope left it would fall back to unscoped legacy access);

@@ -218,7 +218,12 @@ const toggleItemsStatus = async (req, res) => {
     }
 };
 
-const getSelfServiceTransactions = async (req, res) => {
+const STUDENT_ORDER_STATUSES = ['PENDING', 'LOADED_TO_POS', 'COMPLETED', 'CANCELLED'];
+
+// Student pre-orders placed through the student ordering app, newest first.
+// Optional filters: status, search (order ID or student email), filterBranchId
+// (Main Branch only).
+const getStudentOrders = async (req, res) => {
     const { branchId: userBranchId } = req.user;
 
     // RBAC-M8: Admin users with no branchId must supply an explicit branchId query param.
@@ -231,46 +236,57 @@ const getSelfServiceTransactions = async (req, res) => {
     }
 
     const resolvedBranchId = req.user.branchId;
-    const { page = 1, limit = 20, filterBranchId } = req.query;
+    const { page = 1, limit = 20, filterBranchId, status, search } = req.query;
+
+    if (status && !STUDENT_ORDER_STATUSES.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+    }
 
     try {
         const currentBranchRes = await pool.query('SELECT name FROM branches WHERE id = $1 AND is_active = true', [resolvedBranchId]);
         const isMainBranch = currentBranchRes.rows[0]?.name === 'Main Branch';
 
-        const pageNum = parseInt(page) || 1;
-        const limitNum = parseInt(limit) || 20;
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const limitNum = Math.min(Math.max(1, parseInt(limit) || 20), 100);
         const offset = (pageNum - 1) * limitNum;
 
-        let whereClause = "WHERE t.order_source = 'SELF_SERVICE'";
+        const whereClauses = [];
         const params = [];
 
         if (!isMainBranch) {
-            whereClause += ' AND t.branch_id = $1';
             params.push(resolvedBranchId);
+            whereClauses.push(`o.branch_id = $${params.length}`);
         } else if (filterBranchId) {
-            whereClause += ' AND t.branch_id = $1';
             params.push(filterBranchId);
+            whereClauses.push(`o.branch_id = $${params.length}`);
+        }
+        if (status) {
+            params.push(status);
+            whereClauses.push(`o.status = $${params.length}`);
+        }
+        if (typeof search === 'string' && search.trim()) {
+            params.push(`%${search.trim().replace(/[\\%_]/g, '\\$&')}%`);
+            whereClauses.push(`(o.id ILIKE $${params.length} OR o.student_email ILIKE $${params.length})`);
         }
 
-        const countQuery = `
-            SELECT COUNT(*) as total
-            FROM transactions t
-            JOIN branches b ON t.branch_id = b.id
-            ${whereClause}
-        `;
-        const countRes = await pool.query(countQuery, params);
+        const whereClause = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        const countRes = await pool.query(
+            `SELECT COUNT(*) AS total FROM student_orders o ${whereClause}`,
+            params
+        );
         const total = parseInt(countRes.rows[0].total);
 
-        let query = `
-            SELECT t.id, t.total_amount, t.date, t.status, t.payment_method, t.recipient_name, t.items, b.name as branch_name
-            FROM transactions t
-            JOIN branches b ON t.branch_id = b.id
-            ${whereClause}
-            ORDER BY t.date DESC
-            LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-        `;
-
-        const result = await pool.query(query, [...params, limitNum, offset]);
+        const result = await pool.query(
+            `SELECT o.id, o.student_email, o.items, o.total_amount, o.status,
+                    o.created_at, o.loaded_at, o.completed_at, b.name AS branch_name
+             FROM student_orders o
+             LEFT JOIN branches b ON o.branch_id = b.id
+             ${whereClause}
+             ORDER BY o.created_at DESC
+             LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+            [...params, limitNum, offset]
+        );
 
         res.json({
             data: result.rows,
@@ -282,8 +298,8 @@ const getSelfServiceTransactions = async (req, res) => {
             }
         });
     } catch (err) {
-        logger.error('Error fetching self-service transactions:', err);
-        res.status(500).json({ error: 'Failed to fetch transactions' });
+        logger.error('Error fetching student orders:', err);
+        res.status(500).json({ error: 'Failed to fetch student orders' });
     }
 };
 
@@ -306,8 +322,6 @@ const createFnBSession = async (req, res) => {
             [branchId, ipAddress, userAgent]
         );
 
-        emitEvent('fnb:activity', { type: 'session_created', branchId }, branchId);
-
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.json({ sessionId: result.rows[0].id });
     } catch (err) {
@@ -316,140 +330,11 @@ const createFnBSession = async (req, res) => {
     }
 };
 
-const logFnBActivity = async (req, res) => {
-    const { sessionId, action, metadata } = req.body;
-
-    // SEC-C3: Validate action against an allowlist
-    const ALLOWED_ACTIONS = [
-        'view_menu', 'add_to_cart', 'remove_from_cart', 'update_quantity',
-        'initiate_checkout', 'checkout_success', 'checkout_failed',
-        'session_started', 'session_ended', 'page_view', 'payment_initiated',
-        'payment_confirmed', 'payment_failed', 'order_placed'
-    ];
-    if (!action || !ALLOWED_ACTIONS.includes(action)) {
-        return res.status(400).json({ error: 'Invalid action' });
-    }
-
-    // SEC-C3 / SEC-M6: Validate sessionId is a valid UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!sessionId || !uuidRegex.test(sessionId)) {
-        return res.status(400).json({ error: 'Invalid sessionId' });
-    }
-
-    // SEC-C3: Cap metadata to 1024 bytes
-    let safeMetadata = metadata || {};
-    const metaStr = JSON.stringify(safeMetadata);
-    if (metaStr.length > 1024) {
-        return res.status(400).json({ error: 'metadata exceeds maximum allowed size' });
-    }
-
-    try {
-        // SEC-C3: Verify sessionId belongs to an active session before writing
-        const sessionCheck = await pool.query(
-            "SELECT branch_id FROM fnb_sessions WHERE id = $1 AND status != 'ABANDONED'",
-            [sessionId]
-        );
-        if (sessionCheck.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid or expired session' });
-        }
-        const branchId = sessionCheck.rows[0].branch_id;
-
-        await pool.query(
-            'INSERT INTO fnb_activity_logs (session_id, action, metadata) VALUES ($1, $2, $3)',
-            [sessionId, action, safeMetadata]
-        );
-
-        // SEC-H7: Only emit whitelisted fields — never emit raw user-supplied metadata
-        if (branchId) {
-            emitEvent('fnb:activity', { type: 'log_created', action, timestamp: new Date().toISOString(), sessionId }, branchId);
-        }
-
-        res.json({ success: true });
-    } catch (err) {
-        logger.error('Error logging FnB activity:', err);
-        res.status(500).json({ error: 'Failed to log activity' });
-    }
-};
-
-const getFnBActivityLogs = async (req, res) => {
-    const { branchId: userBranchId } = req.user;
-
-    // RBAC-M8: Admin users with no branchId must supply an explicit branchId query param.
-    if (!userBranchId && req.user.role?.toLowerCase() === ROLES.ADMIN) {
-        const scopedBranchId = req.query.branchId;
-        if (!scopedBranchId) {
-            return res.status(400).json({ error: 'branchId required for self-service scope' });
-        }
-        req.user = { ...req.user, branchId: scopedBranchId };
-    }
-
-    const resolvedBranchId = req.user.branchId;
-    const { page = 1, limit = 50, sessionId, filterBranchId } = req.query;
-
-    try {
-        const currentBranchRes = await pool.query('SELECT name FROM branches WHERE id = $1 AND is_active = true', [resolvedBranchId]);
-        const isMainBranch = currentBranchRes.rows[0]?.name === 'Main Branch';
-
-        const pageNum = parseInt(page) || 1;
-        const limitNum = parseInt(limit) || 50;
-        const offset = (pageNum - 1) * limitNum;
-
-        let query = `
-            SELECT l.*, s.branch_id, s.ip_address, s.user_agent, b.name as branch_name
-            FROM fnb_activity_logs l
-            JOIN fnb_sessions s ON l.session_id = s.id
-            JOIN branches b ON s.branch_id = b.id
-        `;
-        const params = [];
-        let whereClauses = [];
-
-        if (!isMainBranch) {
-            whereClauses.push(`s.branch_id = $${params.length + 1}`);
-            params.push(resolvedBranchId);
-        } else if (filterBranchId) {
-            whereClauses.push(`s.branch_id = $${params.length + 1}`);
-            params.push(filterBranchId);
-        }
-
-        if (sessionId) {
-            whereClauses.push(`l.session_id = $${params.length + 1}`);
-            params.push(sessionId);
-        }
-
-        if (whereClauses.length > 0) {
-            query += ' WHERE ' + whereClauses.join(' AND ');
-        }
-
-        const countQuery = `SELECT COUNT(*) FROM (${query}) AS logs_count`;
-        const countRes = await pool.query(countQuery, params);
-        const total = parseInt(countRes.rows[0].count);
-
-        query += ' ORDER BY l.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-
-        const result = await pool.query(query, [...params, limitNum, offset]);
-
-        res.json({
-            data: result.rows,
-            pagination: {
-                total,
-                page: pageNum,
-                limit: limitNum,
-                totalPages: Math.ceil(total / limitNum)
-            }
-        });
-    } catch (err) {
-        logger.error('Error fetching FnB activity logs:', err);
-        res.status(500).json({ error: 'Failed to fetch logs' });
-    }
-};
-
 module.exports = {
     getSelfServiceStatus,
     toggleBranchStatus,
     toggleItemStatus,
     toggleItemsStatus,
-    getSelfServiceTransactions,
-    createFnBSession,
-    logFnBActivity,
-    getFnBActivityLogs
+    getStudentOrders,
+    createFnBSession
 };

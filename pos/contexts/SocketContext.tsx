@@ -101,6 +101,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
             setLastEvent({ type: 'menu:updated', data });
         });
 
+        socketInstance.on('student-order:updated', (data) => {
+            setLastEvent({ type: 'student-order:updated', data });
+        });
+
         socketInstance.on('user:force-logout', (data) => {
             setLastEvent({ type: 'user:force-logout', data });
         });
